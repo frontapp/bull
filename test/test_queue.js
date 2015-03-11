@@ -2,6 +2,7 @@ var Job = require('../lib/job');
 var Queue = require('../');
 var expect = require('expect.js');
 var Promise = require('bluebird');
+var Redis = require('redis');
 
 var STD_QUEUE_NAME = 'test queue';
 
@@ -18,20 +19,17 @@ describe('Queue', function(){
       queue.close();
       done();
     });
-  })
+  });
 
   it('create a queue with standard redis opts', function(done){
     var queue = Queue('standard');
 
     queue.once('ready', function(){
       expect(queue.client.host).to.be('127.0.0.1');
-      expect(queue.bclient.host).to.be('127.0.0.1');
 
       expect(queue.client.port).to.be(6379);
-      expect(queue.bclient.port).to.be(6379);
 
       expect(queue.client.selected_db).to.be(0);
-      expect(queue.bclient.selected_db).to.be(0);
 
       done();
     });
@@ -42,13 +40,10 @@ describe('Queue', function(){
 
     queue.once('ready', function(){
       expect(queue.client.host).to.be('127.0.0.1');
-      expect(queue.bclient.host).to.be('127.0.0.1');
 
       expect(queue.client.port).to.be(6379);
-      expect(queue.bclient.port).to.be(6379);
 
       expect(queue.client.selected_db).to.be(1);
-      expect(queue.bclient.selected_db).to.be(1);
 
       done();
     });
@@ -59,10 +54,23 @@ describe('Queue', function(){
 
     queue.once('ready', function(){
       expect(queue.client.host).to.be('localhost');
-      expect(queue.bclient.host).to.be('localhost');
 
       expect(queue.client.selected_db).to.be(0);
-      expect(queue.bclient.selected_db).to.be(0);
+
+      done();
+    });
+  })
+
+  it('create a queue using a shared redis client', function(done){
+    var redisClient = Redis.createClient(6379, 'localhost');
+    var queue = Queue('custom', {sharedClient: redisClient});
+
+    queue.once('ready', function(){
+      expect(queue.client.host).to.be('localhost');
+
+      expect(queue.client.port).to.be(6379);
+
+      expect(queue.client.selected_db).to.be(0);
 
       done();
     });
@@ -70,12 +78,13 @@ describe('Queue', function(){
 
   it('create a queue with dots in its name', function(done){
     var queue = Queue('using. dots. in.name.');
-
     queue.process(function(job, jobDone){
+      expect(job.data.foo).to.be.equal('bar')
+      
       expect(job.data.foo).to.be.equal('bar')
       jobDone();
       done();
-    })
+    });
 
     queue.add({foo: 'bar'}).then(function(job){
       expect(job.jobId).to.be.ok()
@@ -87,6 +96,7 @@ describe('Queue', function(){
 
   it('should recover from a connection loss', function(done){
     queue = Queue('test connection loss');
+
     queue.on('error', function(err){
       // error event has to be observed or the exception will bubble up
     }).process(function(job, jobDone){
@@ -96,11 +106,12 @@ describe('Queue', function(){
     });
 
     // Simulate disconnect
-    queue.bclient.stream.end();
-    queue.bclient.emit('error', new Error('ECONNRESET'));
-
-    // add something to the queue
-    queue.add({'foo': 'bar'});
+    queue.on('ready_process', function () {
+      queue.bclient.stream.end();
+      queue.bclient.emit('error', new Error('ECONNRESET'));
+      // add something to the queue
+      queue.add({'foo': 'bar'});
+    });
   });
 
   it('process a job', function(done){
@@ -167,7 +178,6 @@ describe('Queue', function(){
       queueStalled.add({bar1: 'baz1'}),
       queueStalled.add({bar2: 'baz2'}),
       queueStalled.add({bar3: 'baz3'})];
-
     Promise.all(jobs).then(function(){
       queueStalled.process(function(job){
         // instead of completing we just close the queue to simulate a crash.

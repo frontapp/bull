@@ -198,4 +198,26 @@ describe('Job', function(){
       });
   });
 
+  describe('.moveToFailed, retry, moveToCompleted', function () {
+      it('makes error disappear from job', function (cb) {
+        queue.add({foo: 'oups'});
+        queue.handler = null;
+        queue.process(function (job, done) {
+          done(new Error('the job failed'));
+        });
+
+        queue.once('failed', function (job) {
+          expect(job._error).to.be.equal('the job failed');
+          queue.once('waiting', function (job) {
+            job.moveToCompleted().then(function () {
+              expect(job._error).to.be(null);
+              cb();
+            });
+          });
+
+          job.retry();
+        });
+      });
+  });
+
 });

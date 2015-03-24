@@ -128,6 +128,19 @@ describe('Queue', function(){
         });
       });
     });
+
+    it('create a queue using a shared redis client to add jobs', function(done){
+      var redisClient = redis.createClient(6379, 'localhost');
+      var queue = Queue('custom', {sharedClient: redisClient});
+
+      queue.once('ready', function(){
+        expect(queue.client.connectionOption.host).to.be('localhost');
+        expect(queue.client.connectionOption.port).to.be(6379);
+        expect(queue.client.selected_db).to.be(0);
+
+        done();
+      });
+    })
   });
 
   describe('connection', function(){

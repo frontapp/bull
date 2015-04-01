@@ -171,7 +171,7 @@ describe('Job', function(){
           }).then(function(){
             return job.isCompleted().then(function(isCompleted){
               expect(isCompleted).to.be(true);
-              expect(job._error).to.be(null);
+              expect(job.stacktrace).to.be(null);
               expect(job._updated).not.be(null);
             });
           });
@@ -189,8 +189,7 @@ describe('Job', function(){
           }).then(function(){
             return job.isFailed().then(function(isFailed){
               expect(isFailed).to.be(true);
-              expect(job.stacktrace).not.be(null);
-              expect(job._error).be('test error');
+              expect(job.stacktrace).to.contain('test error');
               expect(job._updated).not.be(null);
             });
           });
@@ -207,10 +206,10 @@ describe('Job', function(){
         });
 
         queue.once('failed', function (job) {
-          expect(job._error).to.be.equal('the job failed');
+          expect(job.stacktrace).to.contain('the job failed');
           queue.once('waiting', function (job) {
             job.moveToCompleted().then(function () {
-              expect(job._error).to.be(null);
+              expect(job.stacktrace).to.be(null);
               cb();
             });
           });

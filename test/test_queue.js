@@ -97,6 +97,10 @@ describe('Queue', function(){
 
     beforeEach(function () {
         testQueue = new Queue('test');
+        // Set a process handler so bclient is initialize
+        testQueue.process(function(job, jobDone){
+          jobDone();
+        });
     });
 
     it('should call end on the client', function () {
@@ -131,7 +135,7 @@ describe('Queue', function(){
     it('should create a queue with standard redis opts', function(done){
       queue = Queue('standard');
 
-      queue.once('ready', function(){
+      queue.once('ready_process', function(){
         expect(queue.client.connectionOption.host).to.be('127.0.0.1');
         expect(queue.bclient.connectionOption.host).to.be('127.0.0.1');
 
@@ -143,12 +147,17 @@ describe('Queue', function(){
 
         done();
       });
+
+      // Set a process handler so bclient is initialize
+      queue.process(function(job, jobDone){
+        jobDone();
+      });
     });
 
     it('creates a queue using the supplied redis DB', function(done){
       queue = Queue('custom', {redis: {DB: 1}});
 
-      queue.once('ready', function(){
+      queue.once('ready_process', function(){
         expect(queue.client.connectionOption.host).to.be('127.0.0.1');
         expect(queue.bclient.connectionOption.host).to.be('127.0.0.1');
 
@@ -160,18 +169,28 @@ describe('Queue', function(){
 
         done();
       });
+
+      // Set a process handler so bclient is initialize
+      queue.process(function(job, jobDone){
+        jobDone();
+      });
     });
 
     it('creates a queue using custom the supplied redis host', function(done){
       queue = Queue('custom', {redis: {host: 'localhost'}});
 
-      queue.once('ready', function(){
+      queue.once('ready_process', function(){
         expect(queue.client.connectionOption.host).to.be('localhost');
         expect(queue.bclient.connectionOption.host).to.be('localhost');
 
         expect(queue.client.selected_db).to.be(0);
         expect(queue.bclient.selected_db).to.be(0);
         done();
+      });
+
+      // Set a process handler so bclient is initialize
+      queue.process(function(job, jobDone){
+        jobDone();
       });
     });
 
@@ -193,12 +212,17 @@ describe('Queue', function(){
       var redisClient = redis.createClient(6379, 'localhost');
       var queue = Queue('custom', {sharedClient: redisClient});
 
-      queue.once('ready', function(){
+      queue.once('ready_process', function(){
         expect(queue.client.connectionOption.host).to.be('localhost');
         expect(queue.client.connectionOption.port).to.be(6379);
         expect(queue.client.selected_db).to.be(0);
 
         done();
+      });
+
+      // Set a process handler so bclient is initialize
+      queue.process(function(job, jobDone){
+        jobDone();
       });
     })
   });
@@ -208,7 +232,8 @@ describe('Queue', function(){
       queue = Queue('test connection loss');
       queue.on('error', function(err){
         // error event has to be observed or the exception will bubble up
-      }).process(function(job, jobDone){
+      });
+      queue.process(function(job, jobDone){
         expect(job.data.foo).to.be.equal('bar');
         jobDone();
         done();
@@ -238,18 +263,19 @@ describe('Queue', function(){
       queue.bclient.emit('end');
     });
 
-    it('should not try to reconnect when the blocking client triggers an "end" event and no process have been called', function (done) {
-      queue = buildQueue();
+    // Irrelevant as bclient not initialized if process not called
+    // it('should not try to reconnect when the blocking client triggers an "end" event and no process have been called', function (done) {
+    //   queue = buildQueue();
 
-      var runSpy = sandbox.spy(queue, 'run');
+    //   var runSpy = sandbox.spy(queue, 'run');
 
-      queue.bclient.emit('end');
+    //   queue.bclient.emit('end');
 
-      setTimeout(function() {
-        expect(runSpy.callCount).to.be(0);
-        done()
-      }, 100)
-    });
+    //   setTimeout(function() {
+    //     expect(runSpy.callCount).to.be(0);
+    //     done()
+    //   }, 100)
+    // });
   });
 
   describe(' a worker', function(){
